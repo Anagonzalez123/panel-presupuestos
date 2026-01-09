@@ -2,6 +2,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 /* Layout */
 import Layout from "./components/Layout";
+import Solicitudes from "./pages/Solicitudes";
+
 
 /* Pages */
 import HomePublica from "./pages/HomePublica";
@@ -36,11 +38,21 @@ function App() {
             </Layout>
           }
         />
+
+    
         <Route
           path="/admin/clientes"
           element={
             <Layout>
               <Clientes />
+            </Layout>
+          }
+        />
+        <Route
+          path="/admin/solicitudes"
+          element={
+            <Layout>
+              <Solicitudes />
             </Layout>
           }
         />

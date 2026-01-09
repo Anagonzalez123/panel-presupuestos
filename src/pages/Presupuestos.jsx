@@ -1,3 +1,4 @@
+// src/pages/Presupuestos.jsx
 import {
   Box,
   Button,
@@ -8,115 +9,97 @@ import {
   DialogContent,
   DialogActions,
   TextField,
-  MenuItem,
-  Select,
-  InputLabel,
-  FormControl,
-  IconButton
+  IconButton,
+  Table,
+  TableHead,
+  TableRow,
+  TableCell,
+  TableBody
 } from "@mui/material";
 import { useState, useEffect } from "react";
-import { Table, TableHead, TableRow, TableCell, TableBody } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import jsPDF from "jspdf";
 
-/* =========================
-   Utilidad moneda
-========================= */
 const formatoMoneda = (valor) =>
   new Intl.NumberFormat("es-AR", {
     style: "currency",
     currency: "ARS"
   }).format(Number(valor));
 
-/* =========================
-   Rubros fijos
-========================= */
-const RUBROS = ["Carpintería", "Electricidad", "Servicios", "Diseño", "Otro"];
-
 const Presupuestos = () => {
   const [open, setOpen] = useState(false);
   const [editIndex, setEditIndex] = useState(null);
-
-  const [clientes, setClientes] = useState([]);
-
-  const [presupuestos, setPresupuestos] = useState(() => {
-    const data = localStorage.getItem("presupuestos");
-    return data ? JSON.parse(data) : [];
-  });
-
+  const [presupuestos, setPresupuestos] = useState([]);
+  const [solicitudes, setSolicitudes] = useState([]);
   const [form, setForm] = useState({
-    rubro: "",
-    clienteId: "",
-    clienteNombre: "",
-    descripcion: "",
+    cliente: "",
+    telefono: "",
+    email: "",
+    detalle: "",
     total: ""
   });
 
-  /* =========================
-     Cargar clientes
-  ========================== */
+  // Cargar datos de localStorage
   useEffect(() => {
-    const data = localStorage.getItem("clientes");
-    setClientes(data ? JSON.parse(data) : []);
+    const dataPresupuestos = localStorage.getItem("presupuestos");
+    setPresupuestos(dataPresupuestos ? JSON.parse(dataPresupuestos) : []);
+
+    const dataSolicitudes = localStorage.getItem("solicitudes");
+    setSolicitudes(dataSolicitudes ? JSON.parse(dataSolicitudes) : []);
   }, []);
 
-  /* =========================
-     Persistencia
-  ========================== */
+  // Guardar presupuestos
   useEffect(() => {
     localStorage.setItem("presupuestos", JSON.stringify(presupuestos));
   }, [presupuestos]);
 
-  /* =========================
-     Handlers
-  ========================== */
+  // Manejo de formulario
   const handleChange = (e) => {
-    setForm({
-      ...form,
-      [e.target.name]: e.target.value
-    });
+    setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const abrirNuevo = () => {
+  // Abrir modal de nuevo presupuesto
+  const abrirNuevo = (solicitud = null) => {
     setEditIndex(null);
     setForm({
-      rubro: "",
-      clienteId: "",
-      clienteNombre: "",
-      descripcion: "",
+      cliente: solicitud?.nombre || "",
+      telefono: solicitud?.telefono || "",
+      email: solicitud?.email || "",
+      detalle: solicitud?.detalle || "",
       total: ""
     });
     setOpen(true);
   };
 
+  // Abrir modal para editar
   const abrirEditar = (p, index) => {
     setEditIndex(index);
-    setForm({
-      rubro: p.rubro,
-      clienteId: p.clienteId,
-      clienteNombre: p.clienteNombre,
-      descripcion: p.descripcion,
-      total: p.total
-    });
+    setForm({ ...p });
     setOpen(true);
   };
 
+  // Guardar presupuesto
   const guardarPresupuesto = () => {
-    if (!form.rubro || !form.clienteId || !form.total) return;
+    if (!form.cliente || !form.detalle || !form.total) {
+      alert("Completá los campos obligatorios: Cliente, Detalle y Valor");
+      return;
+    }
 
-    const data = {
+    const nuevoPresupuesto = {
       ...form,
-      fecha: editIndex !== null ? presupuestos[editIndex].fecha : new Date().toISOString()
+      id: editIndex !== null ? presupuestos[editIndex].id : Date.now(),
+      fecha: new Date().toISOString(),
+      numero: editIndex !== null ? presupuestos[editIndex].numero : presupuestos.length + 1
     };
 
     if (editIndex !== null) {
       const copia = [...presupuestos];
-      copia[editIndex] = data;
+      copia[editIndex] = nuevoPresupuesto;
       setPresupuestos(copia);
     } else {
-      setPresupuestos([...presupuestos, data]);
+      setPresupuestos([...presupuestos, nuevoPresupuesto]);
     }
 
     setOpen(false);
@@ -124,65 +107,71 @@ const Presupuestos = () => {
   };
 
   const eliminarPresupuesto = (index) => {
-    setPresupuestos(presupuestos.filter((_, i) => i !== index));
+    const copia = presupuestos.filter((_, i) => i !== index);
+    setPresupuestos(copia);
   };
 
-  /* =========================
-     EXPORTAR PDF
-  ========================== */
   const exportarPDF = (p) => {
     const doc = new jsPDF();
-
     doc.setFontSize(20);
     doc.text("PRESUPUESTO", 105, 20, { align: "center" });
 
     doc.setFontSize(11);
-    doc.text(`Fecha: ${new Date(p.fecha).toLocaleDateString("es-AR")}`, 14, 35);
-    doc.text(`Rubro: ${p.rubro}`, 14, 42);
-    doc.text(`Cliente: ${p.clienteNombre}`, 14, 49);
+    doc.text(`Número: ${p.numero}`, 14, 35);
+    doc.text(`Fecha: ${new Date(p.fecha).toLocaleDateString("es-AR")}`, 14, 42);
+    doc.text(`Cliente: ${p.cliente}`, 14, 49);
+    doc.text(`Teléfono: ${p.telefono || "-"}`, 14, 56);
+    doc.text(`Email: ${p.email || "-"}`, 14, 63);
 
     doc.setFontSize(12);
-    doc.text("Detalle del servicio:", 14, 60);
+    doc.text("Detalle del servicio:", 14, 75);
+    const descripcionLines = doc.splitTextToSize(p.detalle, 180);
     doc.setFontSize(11);
-    const descripcionLines = doc.splitTextToSize(p.descripcion, 180);
-    doc.text(descripcionLines, 14, 68);
+    doc.text(descripcionLines, 14, 82);
 
     doc.setFontSize(12);
-    doc.text(
-      `Total: ${formatoMoneda(p.total)}`,
-      14,
-      68 + descripcionLines.length * 7
-    );
+    doc.text(`Total: ${formatoMoneda(p.total)}`, 14, 82 + descripcionLines.length * 7);
 
-    doc.save(`Presupuesto-${p.clienteNombre}.pdf`);
+    doc.save(`Presupuesto-${p.cliente}.pdf`);
   };
 
-  /* =========================
-     Render
-  ========================== */
   return (
     <Box>
       <Box sx={{ display: "flex", justifyContent: "space-between", mb: 3 }}>
-        <Typography variant="h4" fontWeight="bold">
-          Presupuestos
-        </Typography>
-        <Button variant="contained" onClick={abrirNuevo}>
-          Nuevo presupuesto
-        </Button>
+        <Typography variant="h4" fontWeight="bold">Presupuestos</Typography>
+        <Button variant="contained" onClick={() => abrirNuevo()}>Nuevo presupuesto</Button>
       </Box>
+
+      {solicitudes.length > 0 && (
+        <Paper sx={{ p: 3, mb: 4 }}>
+          <Typography variant="h6" fontWeight="bold" mb={2}>
+            Solicitudes públicas pendientes
+          </Typography>
+          {solicitudes.map((s) => (
+            <Box key={s.id} sx={{ display: "flex", justifyContent: "space-between", mb: 1, p: 1, border: "1px solid #eee", borderRadius: 1 }}>
+              <Box>
+                <Typography><b>{s.nombre}</b> - {s.telefono}</Typography>
+                <Typography>{s.email || "-"}</Typography>
+                <Typography>{s.detalle}</Typography>
+              </Box>
+              <Button variant="contained" onClick={() => abrirNuevo(s)}>Crear presupuesto</Button>
+            </Box>
+          ))}
+        </Paper>
+      )}
 
       <Paper sx={{ p: 3 }}>
         {presupuestos.length === 0 ? (
-          <Typography color="text.secondary">
-            Todavía no hay presupuestos cargados
-          </Typography>
+          <Typography color="text.secondary">Todavía no hay presupuestos cargados</Typography>
         ) : (
           <Table>
             <TableHead>
               <TableRow>
+                <TableCell><b>Número</b></TableCell>
                 <TableCell><b>Fecha</b></TableCell>
-                <TableCell><b>Rubro</b></TableCell>
                 <TableCell><b>Cliente</b></TableCell>
+                <TableCell><b>Teléfono</b></TableCell>
+                <TableCell><b>Email</b></TableCell>
                 <TableCell><b>Detalle</b></TableCell>
                 <TableCell><b>Total</b></TableCell>
                 <TableCell align="right"><b>Acciones</b></TableCell>
@@ -190,17 +179,19 @@ const Presupuestos = () => {
             </TableHead>
             <TableBody>
               {presupuestos.map((p, index) => (
-                <TableRow key={index}>
+                <TableRow key={p.id}>
+                  <TableCell>{p.numero}</TableCell>
                   <TableCell>{new Date(p.fecha).toLocaleDateString("es-AR")}</TableCell>
-                  <TableCell>{p.rubro}</TableCell>
-                  <TableCell>{p.clienteNombre}</TableCell>
-                  <TableCell>{p.descripcion}</TableCell>
+                  <TableCell>{p.cliente}</TableCell>
+                  <TableCell>{p.telefono || "-"}</TableCell>
+                  <TableCell>{p.email || "-"}</TableCell>
+                  <TableCell>{p.detalle}</TableCell>
                   <TableCell>{formatoMoneda(p.total)}</TableCell>
                   <TableCell align="right">
-                    <IconButton onClick={() => abrirEditar(p, index)}>
+                    <IconButton color="primary" onClick={() => abrirEditar(p, index)}>
                       <EditIcon />
                     </IconButton>
-                    <IconButton onClick={() => exportarPDF(p)}>
+                    <IconButton color="secondary" onClick={() => exportarPDF(p)}>
                       <PictureAsPdfIcon />
                     </IconButton>
                     <IconButton color="error" onClick={() => eliminarPresupuesto(index)}>
@@ -215,60 +206,45 @@ const Presupuestos = () => {
       </Paper>
 
       <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>
-          {editIndex !== null ? "Editar Presupuesto" : "Nuevo Presupuesto"}
-        </DialogTitle>
+        <DialogTitle>{editIndex !== null ? "Editar Presupuesto" : "Nuevo Presupuesto"}</DialogTitle>
         <DialogContent sx={{ mt: 1 }}>
-          <FormControl fullWidth margin="normal">
-            <InputLabel>Rubro</InputLabel>
-            <Select
-              label="Rubro"
-              name="rubro"
-              value={form.rubro}
-              onChange={handleChange}
-            >
-              {RUBROS.map((rubro) => (
-                <MenuItem key={rubro} value={rubro}>
-                  {rubro}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
-          <FormControl fullWidth margin="normal">
-            <InputLabel>Cliente</InputLabel>
-            <Select
-              label="Cliente"
-              value={form.clienteId}
-              onChange={(e) => {
-                const cliente = clientes.find(c => c.id === e.target.value);
-                setForm({
-                  ...form,
-                  clienteId: cliente.id,
-                  clienteNombre: cliente.nombre
-                });
-              }}
-            >
-              {clientes.map((c) => (
-                <MenuItem key={c.id} value={c.id}>
-                  {c.nombre}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
+          <TextField
+            fullWidth
+            label="Cliente"
+            name="cliente"
+            margin="normal"
+            value={form.cliente}
+            onChange={handleChange}
+          />
+          <TextField
+            fullWidth
+            label="Teléfono"
+            name="telefono"
+            margin="normal"
+            value={form.telefono}
+            onChange={handleChange}
+          />
+          <TextField
+            fullWidth
+            label="Email"
+            name="email"
+            margin="normal"
+            value={form.email}
+            onChange={handleChange}
+          />
           <TextField
             fullWidth
             label="Detalle del servicio"
-            name="descripcion"
+            name="detalle"
             margin="normal"
-            value={form.descripcion}
+            multiline
+            rows={4}
+            value={form.detalle}
             onChange={handleChange}
           />
-
           <TextField
             fullWidth
-            label="Importe estimado"
+            label="Valor total"
             name="total"
             type="number"
             margin="normal"
@@ -276,12 +252,9 @@ const Presupuestos = () => {
             onChange={handleChange}
           />
         </DialogContent>
-
         <DialogActions>
           <Button onClick={() => setOpen(false)}>Cancelar</Button>
-          <Button variant="contained" onClick={guardarPresupuesto}>
-            Guardar
-          </Button>
+          <Button variant="contained" onClick={guardarPresupuesto}>Guardar</Button>
         </DialogActions>
       </Dialog>
     </Box>
